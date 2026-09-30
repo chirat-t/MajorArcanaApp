@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { FlatList, ImageBackground, StyleSheet, View } from 'react-native';
+import { FlatList, ImageBackground, Platform, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -60,7 +60,7 @@ function CollectionCard({
           <ImageBackground
             source={cardImages[card.id]}
             resizeMode="cover"
-            imageStyle={styles.faceImage}
+            imageStyle={[styles.faceImage, Platform.OS === 'web' && styles.faceImageWebFill]}
             style={styles.faceUp}
           >
             <View style={styles.nameBar}>
@@ -224,6 +224,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   faceImage: { borderRadius: 10 },
+  // react-native-web: ImageBackground ส่งเฉพาะ width/height จาก style ลงไปที่รูปด้านใน
+  // faceUp ใช้ aspectRatio ไม่มี width รูปจึงใช้ขนาดไฟล์จริงแล้วล้นกรอบจนเห็นแค่มุมซ้ายบน
+  // บังคับให้เต็มกรอบเฉพาะบนเว็บ (แนวทางเดียวกับ CardBack.tsx) native ไม่เปลี่ยน
+  faceImageWebFill: { width: '100%', height: '100%' },
   nameBar: {
     backgroundColor: 'rgba(11, 17, 32, 0.72)',
     paddingVertical: 5,
