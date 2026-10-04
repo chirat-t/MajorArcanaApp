@@ -10,6 +10,16 @@ export function getTodaySeed(): number {
   return hashStringToSeed(key);
 }
 
+// โอกาสที่ไพ่แต่ละใบจะออกกลับหัว (หงาย = 1 - ค่านี้) — ปรับที่นี่ที่เดียว ใช้ทั้งการดูดวง
+// ทุกหัวข้อและโชคประจำวัน ผ่าน rollReversed()
+export const REVERSED_PROBABILITY = 0.35;
+
+// สุ่มว่าไพ่กลับหัวหรือไม่ ใช้ random() หนึ่งครั้งเสมอ (เท่าเดิม) จึงไม่ทำให้ลำดับการสุ่ม
+// ของตัวสุ่มแบบ seed (โชคประจำวัน) เลื่อนไป
+export function rollReversed(random: () => number): boolean {
+  return random() < REVERSED_PROBABILITY;
+}
+
 // จั่วไพ่ตามจำนวนใน spread แบบไม่ซ้ำใบ พร้อมสุ่มหงาย/กลับหัวแยกอิสระต่อใบ
 // ผูกกับตำแหน่งตามลำดับใน spread.positions
 export function drawSpread(
@@ -20,7 +30,7 @@ export function drawSpread(
   return spread.positions.map((position, i) => ({
     positionId: position.id,
     cardId: drawn[i].id,
-    reversed: random() < 0.5,
+    reversed: rollReversed(random),
   }));
 }
 

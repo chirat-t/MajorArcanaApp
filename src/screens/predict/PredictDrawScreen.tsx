@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CardBack from '../../components/CardBack';
 import cards from '../../data/cards';
 import topics from '../../data/topics';
-import { createDailyRandom } from '../../utils/cardDraw';
+import { createDailyRandom, rollReversed } from '../../utils/cardDraw';
 import { pickRandomN } from '../../utils/random';
 import { colors, fonts } from '../../theme';
 import type { DrawnCard } from '../../types';
@@ -25,7 +25,7 @@ const DOT_COUNT = 18;
 function useShuffledDeck(seedRandom: () => number) {
   return useMemo(() => {
     const shuffled = pickRandomN(cards, cards.length, seedRandom);
-    return shuffled.map((card) => ({ cardId: card.id, reversed: seedRandom() < 0.5 }));
+    return shuffled.map((card) => ({ cardId: card.id, reversed: rollReversed(seedRandom) }));
   }, [seedRandom]);
 }
 
