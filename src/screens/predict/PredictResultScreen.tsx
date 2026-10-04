@@ -5,7 +5,7 @@ import { Appbar, Button, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cardImages } from '../../assets/cardImages';
-import { composeInterpretation } from '../../data/interpretationTemplates';
+import { composeInterpretation, createUsedTemplates } from '../../data/interpretationTemplates';
 import topics from '../../data/topics';
 import { useCollection } from '../../context/CollectionContext';
 import { colors, fonts } from '../../theme';
@@ -38,23 +38,32 @@ export default function PredictResultScreen({ navigation, route }: Props) {
   const topic = topics.find((t) => t.id === topicId)!;
   const { getCardById, markViewed } = useCollection();
 
-  const rows: ResultRow[] = useMemo(
-    () =>
-      drawnCards.map((drawn) => {
-        const card = getCardById(drawn.cardId)!;
-        const position = topic.spread.positions.find((p) => p.id === drawn.positionId)!;
-        const { body, quote } = composeInterpretation(card, drawn.reversed, topicId, position.label);
-        return {
-          positionId: position.id,
-          positionLabel: position.label,
-          cardId: card.id,
-          cardThaiName: card.thaiName,
-          cardName: card.name,
-          reversed: drawn.reversed,
-          body,
-          quote,
-        };
-      }),
+  const rows: ResultRow[] = useMemo(() => {
+    // ใช้ตัวเดียวกันทั้งชุด เพื่อไม่ให้ประโยคเปิด/ประโยคเชื่อมซ้ำกันระหว่างไพ่ในชุดนี้
+    const used = createUsedTemplates();
+    return drawnCards.map((drawn) => {
+      const card = getCardById(drawn.cardId)!;
+      const position = topic.spread.positions.find((p) => p.id === drawn.positionId)!;
+      const { body, quote } = composeInterpretation(
+        card,
+        drawn.reversed,
+        topicId,
+        position.label,
+        position.id,
+        used
+      );
+      return {
+        positionId: position.id,
+        positionLabel: position.label,
+        cardId: card.id,
+        cardThaiName: card.thaiName,
+        cardName: card.name,
+        reversed: drawn.reversed,
+        body,
+        quote,
+      };
+    });
+  },
     // จงใจคำนวณครั้งเดียวตอน mount — ไม่อยากให้คำตีความเปลี่ยนใหม่ทุกครั้งที่ re-render
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []

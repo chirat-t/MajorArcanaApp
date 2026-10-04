@@ -28,11 +28,11 @@ const topics: ReadingTopic[] = [
     spread: {
       id: 'career-3',
       cardCount: 3,
-      description: 'สถานการณ์ปัจจุบัน → โอกาสหรืออุปสรรค → คำแนะนำ/การกระทำ',
+      description: 'สถานการณ์ปัจจุบัน → โอกาสหรืออุปสรรค → คำแนะนำ',
       positions: [
         { id: 'situation', label: 'สถานการณ์ปัจจุบัน' },
         { id: 'opportunity', label: 'โอกาสหรืออุปสรรค' },
-        { id: 'advice', label: 'คำแนะนำ/การกระทำ' },
+        { id: 'advice', label: 'คำแนะนำ' },
       ],
     },
   },
@@ -59,8 +59,8 @@ const topics: ReadingTopic[] = [
     spread: {
       id: 'daily-1',
       cardCount: 1,
-      description: 'โชคที่คุณจะได้รับในวันนี้',
-      positions: [{ id: 'today', label: 'โชคที่คุณจะได้รับในวันนี้' }],
+      description: 'โชควันนี้',
+      positions: [{ id: 'today', label: 'โชควันนี้' }],
     },
   },
 ];
