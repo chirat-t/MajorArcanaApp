@@ -1,0 +1,59 @@
+name: Test Firestore rules
+
+# รันเทสต์ Security Rules กับ Firestore Emulator (ฟรี ไม่ต่อโปรเจกต์ Firebase จริง ไม่ใช้ credential)
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - tests/**
+      - src/data/cards.ts
+      - src/data/topics.ts
+      - package.json
+      - package-lock.json
+      - .github/workflows/rules-test.yml
+  pull_request:
+    paths:
+      - firestore.rules
+      - firebase.json
+      - tests/**
+      - src/data/cards.ts
+      - src/data/topics.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rules-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # Firestore Emulator เป็นโปรแกรม Java
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ตรวจว่ารายการ id ใน rules ตรงกับ cards.ts/topics.ts (ไม่ต้องใช้ emulator)
+      - name: Check rule ids match app data
+        run: npm run test:rules:ids
+
+      # เปิด emulator ชั่วคราว รันเทสต์ทั้งหมด แล้วปิด — ตารางผลอยู่ใน job summary
+      - name: Run rules tests on Firestore emulator
+        run: npm run test:rules

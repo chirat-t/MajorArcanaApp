@@ -1,0 +1,123 @@
+rules_version = '2';
+
+// Security Rules ของ Major Arcana (Spark plan, ไม่มี Cloud Functions)
+// - users/{uid} และ readings ของตัวเอง: อ่าน/เขียนได้เฉพาะเจ้าของ (Anonymous Auth uid)
+// - stats/global: อ่านได้ทุกคน เพิ่มได้ทีละ 1 เฉพาะไพ่ใน reading ที่สร้างใหม่ใน batch เดียวกัน
+//   และผู้ใช้หนึ่งคนดูดวงได้ไม่เกิน 1 ครั้งต่อ 10 วินาที
+// รายการ id ด้านล่างต้องตรงกับ src/data/cards.ts และ src/data/topics.ts (มีเทสต์ตรวจ)
+// เอกสาร stats/global สร้างเองใน Console: totalReadings (int) = 0, cardCounts = {} (map)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function cardIds() {
+      return ['the-fool', 'the-magician', 'the-high-priestess', 'the-empress', 'the-emperor',
+        'the-hierophant', 'the-lovers', 'the-chariot', 'strength', 'the-hermit',
+        'wheel-of-fortune', 'justice', 'the-hanged-man', 'death', 'temperance', 'the-devil',
+        'the-tower', 'the-star', 'the-moon', 'the-sun', 'judgement', 'the-world'];
+    }
+    function topicIds() {
+      return ['love', 'career', 'advice', 'daily'];
+    }
+    function positionIds() {
+      return ['self', 'other', 'trend', 'situation', 'opportunity', 'advice',
+        'mind', 'body', 'spirit', 'today'];
+    }
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+    function readingPath(uid, id) {
+      return /databases/$(database)/documents/users/$(uid)/readings/$(id);
+    }
+
+    // ---------- users/{uid} ----------
+    function validUserShape(d) {
+      return d.keys().hasOnly(['viewed', 'favorites', 'updatedAt', 'lastReadingId', 'lastReadingAt', 'schemaVersion'])
+        && d.keys().hasAll(['viewed', 'favorites', 'updatedAt', 'schemaVersion'])
+        && d.schemaVersion == 1
+        && d.viewed is map && d.viewed.size() <= 22 && d.viewed.keys().hasOnly(cardIds())
+        && d.favorites is list && d.favorites.size() <= 22 && d.favorites.hasOnly(cardIds())
+        && d.updatedAt == request.time;
+    }
+
+    // lastReadingId/lastReadingAt เปลี่ยนได้เฉพาะใน batch ที่สร้าง reading ใหม่ตัวนั้นจริง
+    // และต้องห่างจากครั้งก่อนอย่างน้อย 10 วินาที (กันยิงดูดวงรัว ๆ เพื่อปั่นสถิติ)
+    function lastReadingChangeOk(uid) {
+      let d = request.resource.data;
+      let changed = resource == null
+        ? d.keys().hasAny(['lastReadingId', 'lastReadingAt'])
+        : d.diff(resource.data).affectedKeys().hasAny(['lastReadingId', 'lastReadingAt']);
+      return !changed || (
+        d.lastReadingAt == request.time
+        && d.lastReadingId is string
+        && !exists(readingPath(uid, d.lastReadingId))
+        && existsAfter(readingPath(uid, d.lastReadingId))
+        && (resource == null || !('lastReadingAt' in resource.data)
+            || request.time > resource.data.lastReadingAt + duration.value(10, 's'))
+      );
+    }
+
+    // ---------- users/{uid}/readings/{readingId} ----------
+    function validReading(d) {
+      return d.keys().hasOnly(['topicId', 'cardIds', 'reversed', 'positionIds', 'createdAt'])
+        && d.keys().hasAll(['topicId', 'cardIds', 'reversed', 'positionIds', 'createdAt'])
+        && d.topicId in topicIds()
+        && d.cardIds is list && d.reversed is list && d.positionIds is list
+        && ((d.topicId == 'daily' && d.cardIds.size() == 1)
+            || (d.topicId != 'daily' && d.cardIds.size() == 3))
+        && d.cardIds.hasOnly(cardIds()) && d.cardIds.toSet().size() == d.cardIds.size()
+        && d.reversed.size() == d.cardIds.size() && d.reversed.hasOnly([true, false])
+        && d.positionIds.size() == d.cardIds.size() && d.positionIds.hasOnly(positionIds())
+        && d.createdAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && validUserShape(request.resource.data)
+        && lastReadingChangeOk(uid);
+      allow list, delete: if false;
+
+      match /readings/{readingId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && readingId.matches('^(daily-[0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Za-z0-9]{20})$')
+          && validReading(request.resource.data)
+          && getAfter(userPath(uid)).data.lastReadingId == readingId
+          && getAfter(userPath(uid)).data.lastReadingAt == request.time;
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ---------- stats/global ----------
+    function incremented(k) {
+      return request.resource.data.cardCounts.get(k, 0) == resource.data.cardCounts.get(k, 0) + 1;
+    }
+    function validStatsIncrement(uid) {
+      let user = getAfter(userPath(uid)).data;
+      let rid = user.lastReadingId;
+      let ids = getAfter(readingPath(uid, rid)).data.cardIds;
+      return user.lastReadingAt == request.time
+        && !exists(readingPath(uid, rid))
+        && request.resource.data.keys().hasOnly(['cardCounts', 'totalReadings'])
+        && request.resource.data.cardCounts is map
+        && request.resource.data.totalReadings is int
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cardCounts', 'totalReadings'])
+        && request.resource.data.totalReadings == resource.data.totalReadings + 1
+        && request.resource.data.cardCounts.diff(resource.data.cardCounts).affectedKeys().hasOnly(ids)
+        && incremented(ids[0])
+        && (ids.size() < 2 || incremented(ids[1]))
+        && (ids.size() < 3 || incremented(ids[2]));
+    }
+
+    match /stats/global {
+      allow get: if true;
+      allow list, create, delete: if false;
+      allow update: if request.auth != null && validStatsIncrement(request.auth.uid);
+    }
+  }
+}
