@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ImageBackground, StyleSheet, View } from 'react-native';
+import { ImageBackground, Platform, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, Text } from 'react-native-paper';
 
@@ -26,7 +26,12 @@ export default function LoadingScreen({ navigation, route }: Props) {
   }, [navigation, cardId]);
 
   return (
-    <ImageBackground source={loadingBackgroundImage} resizeMode="cover" style={styles.container}>
+    <ImageBackground
+      source={loadingBackgroundImage}
+      resizeMode="cover"
+      style={styles.container}
+      imageStyle={Platform.OS === 'web' ? styles.bgWebFill : undefined}
+    >
       {/* ลงเงาทับภาพพื้นหลังเบา ๆ ให้ไพ่ตรงกลางเด่นขึ้น ไม่จมไปกับพื้นหลัง */}
       <View style={styles.scrim} />
 
@@ -48,6 +53,11 @@ export default function LoadingScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // react-native-web: ImageBackground ส่งเฉพาะ width/height จาก style ลงไปที่รูปด้านใน
+  // container ใช้ flex: 1 ไม่มี width/height รูปจึงใช้ขนาดไฟล์จริง (800x1314) วางที่มุมซ้ายบน
+  // จนดูซูมบนมือถือและไม่เต็มจอคอม บังคับให้เต็มกรอบเฉพาะบนเว็บ (แนวทางเดียวกับ CardBack.tsx)
+  // native ไม่เปลี่ยน
+  bgWebFill: { width: '100%', height: '100%' },
   // backgroundColor เป็น fallback สีทึบระหว่างรอโหลดภาพพื้นหลัง/ถ้าโหลดไม่สำเร็จ
   container: {
     flex: 1,
