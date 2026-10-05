@@ -30,10 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env
-.env.local
-.env*.local
+# local env files (ทุกไฟล์ .env* ยกเว้นไฟล์ตัวอย่างที่ไม่มีค่าจริง)
+.env*
+!.env.example
 
 # secrets / credentials
 *secret*
