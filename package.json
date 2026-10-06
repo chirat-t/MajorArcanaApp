@@ -37,7 +37,7 @@
     "web": "expo start --web",
     "export:web": "expo export -p web",
     "test:rules:ids": "node --test tests/rules-ids.test.mjs",
-    "test:rules": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-tarot \"node --test tests/*.test.mjs\""
+    "test:rules": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-tarot \"node --test --test-concurrency=1 tests/*.test.mjs\""
   },
   "private": true
 }

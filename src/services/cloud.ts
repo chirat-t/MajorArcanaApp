@@ -1,8 +1,17 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import { connectAuthEmulator, signInAnonymously, type Auth, type User } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
+import {
+  connectFirestoreEmulator,
+  doc,
+  getDoc,
+  getFirestore,
+  serverTimestamp,
+  setDoc,
+  type Firestore,
+} from 'firebase/firestore';
 
 import { createAuth } from './firebaseAuth';
+import { SCHEMA_VERSION, type UserDocPayload } from './syncMerge';
 
 // ค่า config อ่านจาก EXPO_PUBLIC_* ซึ่ง Expo แทนค่าลงไปตอน build — ต้องเขียน
 // process.env.EXPO_PUBLIC_XXX ตรง ๆ ทีละตัว (อ่านแบบ dynamic เช่น process.env[name] จะไม่ถูกแทนค่า)
@@ -68,4 +77,25 @@ export function ensureSignedIn(): Promise<User | null> {
     });
   }
   return signInPromise;
+}
+
+// อ่านเอกสาร users/{uid} ครั้งเดียว (ไม่ใช้ listener เพื่อประหยัดโควตา) — คืน null ถ้ายังไม่มีเอกสาร
+// throw ถ้าอ่านไม่ได้ (ออฟไลน์/ถูกปฏิเสธ) ให้ผู้เรียกจับเอง
+export async function fetchUserDoc(uid: string): Promise<unknown | null> {
+  const cloud = getCloud();
+  if (!cloud) throw new Error('cloud disabled');
+  const snap = await getDoc(doc(cloud.db, 'users', uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+// เขียน viewed/favorites ด้วย merge เพื่อไม่ทับ field ที่ขั้นอื่นเพิ่ม (lastReadingId/lastReadingAt)
+// รูปแบบตรงกับ firestore.rules: updatedAt ต้องเป็น serverTimestamp และ schemaVersion = 1
+export async function writeUserDoc(uid: string, payload: UserDocPayload): Promise<void> {
+  const cloud = getCloud();
+  if (!cloud) throw new Error('cloud disabled');
+  await setDoc(
+    doc(cloud.db, 'users', uid),
+    { ...payload, updatedAt: serverTimestamp(), schemaVersion: SCHEMA_VERSION },
+    { merge: true }
+  );
 }
